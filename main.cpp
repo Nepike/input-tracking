@@ -2,7 +2,10 @@
 #include <string>
 #include <cassert>
 
-
+enum class ActionType {
+    Press,
+    Release
+};
 
 class InputAction {
 public:
@@ -17,8 +20,8 @@ private:
 
 class KeyboardInput: public InputAction {
 public:
-    KeyboardInput(const std::string& keyName, double actionTime, const std::string& actionType, const std::string& controlName)
-    : keyName_(keyName), actionTime_(actionTime), actionType_(actionType), controlName_(controlName){}
+    KeyboardInput(const std::string& keyName, double actionTime, ActionType actionType, const std::string& controlName)
+        : keyName_(keyName), actionTime_(actionTime), actionType_(actionType), controlName_(controlName) {}
 
     //по поводу const string& - Я читал, что это может быть менее эффективно из-за Named Return Value Optimization (NRVO)
     std::string getType() const override {
@@ -33,13 +36,13 @@ public:
     std::string show() const {
         return "keyname: " + keyName_ + "\n" +
                 "actionTime: " + std::to_string(actionTime_) + "\n" +
-                "actionType: " + actionType_ + "\n" +
+                "actionType: " + (actionType_ == ActionType::Press ? "press" : "release") + "\n" +
                 "controlName: " + controlName_ + "\n";
     }
 
     // Создание объекта "отпускание" по объекту "нажатие" и времени отпускания
     static KeyboardInput createRelease(const KeyboardInput& pressAction, double releaseTime) {
-        return KeyboardInput(pressAction.keyName_, releaseTime, "release", pressAction.controlName_);
+        return KeyboardInput(pressAction.keyName_, releaseTime, ActionType::Release, pressAction.controlName_);
     }
 
     bool operator<(const KeyboardInput& other) const {
@@ -54,15 +57,15 @@ public:
 private:
     std::string keyName_;
     double actionTime_; // Это не длительность, а именно время!
-    std::string actionType_; // "press" или "release" (возможно стоит вспомнить как работают enum'ы)
+    ActionType actionType_;
     std::string controlName_;
 };
 
 
 int main() {
-    std::cout << "Testing KeyboardInput!\n\n";
+    std::cout << "Testing KeyboardInput!\n";
 
-    KeyboardInput press_shift = KeyboardInput("SHIFT", 123.321, "press", "some_ctrl");
+    KeyboardInput press_shift = KeyboardInput("SHIFT", 123.321, ActionType::Press, "some_ctrl");
     KeyboardInput release_shift = KeyboardInput::createRelease(press_shift, 321.123);
 
     assert(press_shift < release_shift);
@@ -72,7 +75,9 @@ int main() {
     InputAction* ptr = &press_shift;
     assert(ptr->getType() == "KeyboardInput");
 
-    std::cout << "All tests passed successfully!\n";
+    std::cout << "All tests passed successfully!\n\n";
+
+    std::cout << press_shift.show() << std::endl << release_shift.show() << std::endl;
 
     return 0;
 }
