@@ -23,15 +23,9 @@ public:
     KeyboardInput(const std::string& keyName, double actionTime, ActionType actionType, const std::string& controlName)
         : keyName_(keyName), actionTime_(actionTime), actionType_(actionType), controlName_(controlName) {}
 
-    //по поводу const string& - Я читал, что это может быть менее эффективно из-за Named Return Value Optimization (NRVO)
     std::string getType() const override {
         return "KeyboardInput";
     }
-    // const std::string& getType() const override {
-    //     static const std::string type = "KeyboardInput";
-    //     return type;
-    // }
-
 
     std::string show() const {
         return "keyname: " + keyName_ + "\n" +
