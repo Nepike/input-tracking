@@ -1,83 +1,153 @@
 #include <iostream>
 #include <string>
 #include <cassert>
+#include <vector>
+#include <set>
+#include <utility>
 
-enum class ActionType {
-    Press,
-    Release
+
+
+class ControlElement;
+
+enum InputType {
+  KeyboardInput,
+  MouseInput,
+  TouchInput,
 };
 
-class InputAction {
-public:
-    virtual ~InputAction() = default; // на всякий случай
-    virtual std::string getType() const = 0;
-protected:
-    // smth
-private:
-    // smth
+enum ActionType {
+  Press,
+  Release,
 };
 
-
-class KeyboardInput: public InputAction {
-public:
-    KeyboardInput(const std::string& keyName, double actionTime, ActionType actionType, const std::string& controlName)
-        : keyName_(keyName), actionTime_(actionTime), actionType_(actionType), controlName_(controlName) {}
-
-    //по поводу const string& - Я читал, что это может быть менее эффективно из-за Named Return Value Optimization (NRVO)
-    std::string getType() const override {
-        return "KeyboardInput";
-    }
-    // const std::string& getType() const override {
-    //     static const std::string type = "KeyboardInput";
-    //     return type;
-    // }
-
-
-    std::string show() const {
-        return "keyname: " + keyName_ + "\n" +
-                "actionTime: " + std::to_string(actionTime_) + "\n" +
-                "actionType: " + (actionType_ == ActionType::Press ? "press" : "release") + "\n" +
-                "controlName: " + controlName_ + "\n";
-    }
-
-    // Создание объекта "отпускание" по объекту "нажатие" и времени отпускания
-    static KeyboardInput createRelease(const KeyboardInput& pressAction, double releaseTime) {
-        return KeyboardInput(pressAction.keyName_, releaseTime, ActionType::Release, pressAction.controlName_);
-    }
-
-    bool operator<(const KeyboardInput& other) const {
-        return actionTime_ < other.actionTime_;
-    }
-
-    bool operator==(const KeyboardInput& other) const {
-        return actionTime_ == other.actionTime_;
-    }
+class Input {
+  public:
+    virtual ~Input() = default;
+    virtual InputType getType() const = 0;
     
-    
-private:
+    bool operator<(const Input& other) const {
+      return actionTime_ < other.actionTime_;
+    }
+
+    bool operator==(const Input& other) const {
+      return actionTime_ == other.actionTime_;  
+    }
+
+    const std::string& getControlName() const {
+      return controlElement_->getName();
+    }
+
+  protected:
+    double actionTime_;
+    ControlElement* controlElement_;
+
+};
+
+class KeyboardInput: public Input {
+  public:
+    KeyboardInput(const std::string& keyName, double actionTime, ActionType actionType, ControlElement* controlElement) {
+      keyName_ = keyName;
+      actionTime_ = actionTime;
+      actionType_ = actionType;
+      controlElement_ = controlElement;
+    }
+
+    InputType getType() const override {
+      return InputType::KeyboardInput;
+    }
+
+    static KeyboardInput createRelease(const KeyboardInput& pressAction, double releaseTime){
+      return KeyboardInput(pressAction.keyName_, releaseTime, ActionType::Release, pressAction.controlElement_);
+    }
+
+  private:
     std::string keyName_;
-    double actionTime_; // Это не длительность, а именно время!
     ActionType actionType_;
-    std::string controlName_;
+};
+
+class MouseInput: public Input {
+  public:
+    MouseInput(int keyNumber, double actionTime, ActionType actionType, ControlElement* controlElement) {
+      keyNumber_ = keyNumber;
+      actionTime_ = actionTime;
+      actionType_ = actionType;
+      controlElement_ = controlElement;
+    }
+
+    InputType getType() const override {
+      return InputType::MouseInput;
+    }
+
+  private:
+    int keyNumber_;
+    ActionType actionType_;
+};
+
+struct FingerCoordinates {
+  std::pair<double, double> start;
+  std::pair<double, double> end;
+};
+
+class TouchInput: public Input {
+  public:
+    TouchInput(double actionTime, const std::vector<FingerCoordinates>& fingersCords,  ControlElement* controlElement) {
+      actionTime_ = actionTime;
+      controlElement_ = controlElement;
+      fingersCords_ = fingersCords;
+      fingersCount_ = fingersCords.size();
+    }
+
+    InputType getType() const override {
+      return InputType::TouchInput;
+    }
+
+  private:
+    std::vector<FingerCoordinates> fingersCords_;
+    int fingersCount_;
+};
+
+class ControlElement {
+  public:
+    ControlElement(const std::string& name, const std::set<InputType>& actions) : name_(name), actions_(actions) {}
+
+    void addAction(InputType action) {
+      actions_.insert(action);
+    }
+
+    bool reactsTo(const Input& input) const {
+      return actions_.find(input.getType()) != actions_.end();
+    }
+
+    const std::string& getName() const {
+      return name_;
+    }
+
+  private:
+    std::string name_;
+    std::set<InputType> actions_; // Набор действий, на которые реагирует элемент
 };
 
 
-int main() {
-    std::cout << "Testing KeyboardInput!\n";
+// int main() {
+//     std::cout << "Testing KeyboardInput!\n";
 
-    KeyboardInput press_shift = KeyboardInput("SHIFT", 123.321, ActionType::Press, "some_ctrl");
-    KeyboardInput release_shift = KeyboardInput::createRelease(press_shift, 321.123);
+//     KeyboardInput press_shift = KeyboardInput("SHIFT", 123.321, ActionType::Press, "some_ctrl");
+//     KeyboardInput release_shift = KeyboardInput::createRelease(press_shift, 321.123);
 
-    assert(press_shift < release_shift);
-    assert(!(press_shift == release_shift));
+//     assert(press_shift < release_shift);
+//     assert(!(press_shift == release_shift));
 
-    // Тестирование полиморфизма
-    InputAction* ptr = &press_shift;
-    assert(ptr->getType() == "KeyboardInput");
+//     // Тестирование полиморфизма
+//     InputAction* ptr = &press_shift;
+//     assert(ptr->getType() == "KeyboardInput");
 
-    std::cout << "All tests passed successfully!\n\n";
+//     std::cout << "All tests passed successfully!\n\n";
 
-    std::cout << press_shift.show() << std::endl << release_shift.show() << std::endl;
+//     std::cout << press_shift.show() << std::endl << release_shift.show() << std::endl;
 
-    return 0;
-}
+//     return 0;
+// }
+
+
+
+
