@@ -6,9 +6,6 @@
 #include <utility>
 
 
-
-class ControlElement;
-
 enum InputType {
   KeyboardInput,
   MouseInput,
@@ -18,6 +15,27 @@ enum InputType {
 enum ActionType {
   Press,
   Release,
+};
+
+class ControlElement {
+  public:
+    ControlElement(const std::string& name, const std::set<InputType>& actions) : name_(name), actions_(actions) {}
+
+    void addAction(InputType action) {
+      actions_.insert(action);
+    }
+
+    bool reactsTo(InputType input) const {
+      return actions_.find(input) != actions_.end();
+    }
+
+    const std::string& getName() const {
+      return name_;
+    }
+
+  private:
+    std::string name_;
+    std::set<InputType> actions_; // Набор действий, на которые реагирует элемент
 };
 
 class Input {
@@ -106,47 +124,10 @@ class TouchInput: public Input {
     int fingersCount_;
 };
 
-class ControlElement {
-  public:
-    ControlElement(const std::string& name, const std::set<InputType>& actions) : name_(name), actions_(actions) {}
 
-    void addAction(InputType action) {
-      actions_.insert(action);
-    }
-
-    bool reactsTo(const Input& input) const {
-      return actions_.find(input.getType()) != actions_.end();
-    }
-
-    const std::string& getName() const {
-      return name_;
-    }
-
-  private:
-    std::string name_;
-    std::set<InputType> actions_; // Набор действий, на которые реагирует элемент
-};
-
-
-// int main() {
-//     std::cout << "Testing KeyboardInput!\n";
-
-//     KeyboardInput press_shift = KeyboardInput("SHIFT", 123.321, ActionType::Press, "some_ctrl");
-//     KeyboardInput release_shift = KeyboardInput::createRelease(press_shift, 321.123);
-
-//     assert(press_shift < release_shift);
-//     assert(!(press_shift == release_shift));
-
-//     // Тестирование полиморфизма
-//     InputAction* ptr = &press_shift;
-//     assert(ptr->getType() == "KeyboardInput");
-
-//     std::cout << "All tests passed successfully!\n\n";
-
-//     std::cout << press_shift.show() << std::endl << release_shift.show() << std::endl;
-
-//     return 0;
-// }
+int main() {
+    return 0;
+}
 
 
 
