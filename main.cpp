@@ -4,15 +4,16 @@
 #include <vector>
 #include <set>
 #include <utility>
+#include <algorithm>
 
 
-enum InputType {
+enum class InputType {
   KeyboardInput,
   MouseInput,
   TouchInput,
 };
 
-enum ActionType {
+enum class ActionType {
   Press,
   Release,
 };
@@ -51,8 +52,12 @@ class Input {
       return actionTime_ == other.actionTime_;  
     }
 
-    const std::string& getControlName() const {
-      return controlElement_->getName();
+    const ControlElement* getControl() const {
+      return controlElement_;
+    }
+
+    double getActionTime() const {
+      return actionTime_;
     }
 
   protected:
@@ -124,9 +129,63 @@ class TouchInput: public Input {
     int fingersCount_;
 };
 
+class ActionsQueue {
+  public:
+    ActionsQueue(): actions_({}) {}
+
+    void addAction(Input* action) {
+      actions_.push_back(action);
+      std::sort(actions_.begin(), actions_.end(), [](const Input* a, const Input* b) {
+        return a->getActionTime() < b->getActionTime();
+      });
+    }
+
+    std::vector<Input*> getActionsForControl(const std::string& controlName, double startTime = 0.0, double endTime = std::numeric_limits<double>::max()) const {
+      std::vector<Input*> result;
+      for (const auto& action : actions_) {
+        if (action->getControl()->getName() == controlName && action->getActionTime() >= startTime && action->getActionTime() <= endTime) {
+          result.push_back(action);
+        }
+      }
+      return result;
+    }
+
+    void executeActions() const {
+      std::cout << std::endl;
+      for (const auto& action : actions_) {
+        const ControlElement* control = action->getControl();
+        if (control->reactsTo(action->getType())){
+          std::cout << "Executing action on control '" << control->getName() << "' at time " << action->getActionTime() << std::endl;
+        }
+      }
+    }
+
+  private:
+    std::vector<Input*> actions_;
+};
+
+
 
 int main() {
-    return 0;
+  ControlElement btn1("button1", {InputType::KeyboardInput, InputType::MouseInput});
+  ControlElement btn2("button2", {InputType::KeyboardInput, InputType::MouseInput});
+  Input* keyPress = new KeyboardInput("A", 1.0, ActionType::Release, &btn1);
+  Input* keyRelease = new KeyboardInput("A", 2.0, ActionType::Press, &btn1);
+  Input* mousePress = new MouseInput(1, 3.0, ActionType::Press, &btn2);
+
+  ActionsQueue actionQueue;
+  actionQueue.addAction(keyPress);
+  actionQueue.addAction(keyRelease);
+  actionQueue.addAction(mousePress);
+
+  auto actions = actionQueue.getActionsForControl("button1", 1.0, 5.0);
+  for (const auto& action : actions) {
+    std::cout << "Action on control " << action->getControl()->getName() << " at time " << action->getActionTime() << '\n';
+  }
+
+  actionQueue.executeActions();
+
+  return 0;
 }
 
 
