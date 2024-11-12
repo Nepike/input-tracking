@@ -107,6 +107,12 @@ class MouseInput: public Input {
 };
 
 struct FingerCoordinates {
+  FingerCoordinates(double sx, double sy, double ex, double ey) {
+    start.first = sx;
+    start.second = sy;
+    end.first = ex;
+    end.second = ey;
+  }
   std::pair<double, double> start;
   std::pair<double, double> end;
 };
@@ -168,15 +174,17 @@ class ActionsQueue {
 
 int main() {
   ControlElement btn1("button1", {InputType::KeyboardInput, InputType::MouseInput});
-  ControlElement btn2("button2", {InputType::KeyboardInput, InputType::MouseInput});
+  ControlElement btn2("button2", {InputType::KeyboardInput, InputType::MouseInput, InputType::TouchInput});
   Input* keyPress = new KeyboardInput("A", 1.0, ActionType::Release, &btn1);
   Input* keyRelease = new KeyboardInput("A", 2.0, ActionType::Press, &btn1);
   Input* mousePress = new MouseInput(1, 3.0, ActionType::Press, &btn2);
+  Input* touchGesture = new TouchInput(6.0, std::vector<FingerCoordinates>({FingerCoordinates(0, 0, 1, 1)}), &btn2);
 
   ActionsQueue actionQueue;
   actionQueue.addAction(keyPress);
   actionQueue.addAction(keyRelease);
   actionQueue.addAction(mousePress);
+  actionQueue.addAction(touchGesture);
 
   auto actions = actionQueue.getActionsForControl("button1", 1.0, 5.0);
   for (const auto& action : actions) {
