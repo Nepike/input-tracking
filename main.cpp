@@ -60,6 +60,10 @@ class Input {
       return actionTime_;
     }
 
+    // TODO
+    // void executeAction(){}
+    // void print(){}
+
   protected:
     double actionTime_;
     ControlElement* controlElement_;
