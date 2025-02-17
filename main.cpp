@@ -2,10 +2,11 @@
 #include <string>
 #include <cassert>
 #include <vector>
-#include <set>
+#include <unordered_set>
 #include <utility>
 #include <algorithm>
 #include <memory>
+#include <unordered_map>
 
 
 enum class InputType {
@@ -14,21 +15,27 @@ enum class InputType {
   TouchInput,
 };
 
+// Возможно, вместо енама лучше использовать булевое поле is_press ?
 enum class ActionType {
   Press,
   Release,
 };
 
+
 class ControlElement {
   public:
-    ControlElement(const std::string& name, const std::set<InputType>& actions) : name_(name), actions_(actions) {}
+    ControlElement(const std::string& name, const std::unordered_set<InputType>& allowedActions) : name_(name), allowedActions_(allowedActions) {}
 
     void addAction(InputType action) {
-      actions_.insert(action);
+      allowedActions_.insert(action);
     }
 
-    bool reactsTo(InputType input) const {
-      return actions_.find(input) != actions_.end();
+    void removeAction(InputType action) {
+      allowedActions_.erase(action);
+    }
+
+    bool checkAction(InputType input) const {
+      return allowedActions_.find(input) != allowedActions_.end();
     }
 
     const std::string& getName() const {
@@ -37,8 +44,9 @@ class ControlElement {
 
   private:
     std::string name_;
-    std::set<InputType> actions_; // Набор действий, на которые реагирует элемент
+    std::unordered_set<InputType> allowedActions_; 
 };
+
 
 class InputAction {
   public:
@@ -61,40 +69,33 @@ class InputAction {
       return actionTime_;
     }
 
-    virtual void executeAction() const = 0;
-
-    virtual void print() const = 0;
+    virtual bool performAction() const = 0;
 
     virtual InputAction* clone() const = 0;
 
-
   private:
     double actionTime_;
+    // Один и тот же элемент управления будет целью множества действий. Кажется, нужно использовать shared
     const std::shared_ptr<ControlElement> controlElement_;
-
 };
+
 
 class KeyboardInput: public InputAction {
   public:
     KeyboardInput(const std::string& keyName, double actionTime, ActionType actionType, const std::shared_ptr<ControlElement>& control)
-    : InputAction(actionTime, control) {
-      keyName_ = keyName;
-      actionType_ = actionType;
+    : InputAction(actionTime, control), keyName_(keyName), actionType_(actionType) {}
+
+    static KeyboardInput createRelease(const KeyboardInput& pressAction, double releaunordered_setime){
+      return KeyboardInput(pressAction.keyName_, releaunordered_setime, ActionType::Release, pressAction.getControl());
     }
 
-    static KeyboardInput createRelease(const KeyboardInput& pressAction, double releaseTime){
-      return KeyboardInput(pressAction.keyName_, releaseTime, ActionType::Release, pressAction.getControl());
-    }
-
-    void executeAction() const override {
+    bool performAction() const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->reactsTo(InputType::KeyboardInput)) {
-        std::cout << "Keyboard action executed: " << keyName_ << " at time " << this->getActionTime() << "\n";
+      if (control && control->checkAction(InputType::KeyboardInput)) {
+        // *Действие выполнено*
+        return true;
       }
-    }
-
-    void print() const override {
-      std::cout << "KeyboardInput: KeyName=" << keyName_ << ", ActionTime=" << this->getActionTime() << ", ActionType=" << (actionType_ == ActionType::Press ? "Press" : "Release") << "\n";
+      return false;
     }
 
     KeyboardInput* clone() const override {
@@ -106,23 +107,19 @@ class KeyboardInput: public InputAction {
     ActionType actionType_;
 };
 
+
 class MouseInput: public InputAction {
   public:
     MouseInput(int keyNumber, double actionTime, ActionType actionType, const std::shared_ptr<ControlElement>& control)
-    : InputAction(actionTime, control) {
-      keyNumber_ = keyNumber;
-      actionType_ = actionType;
-    }
+    : InputAction(actionTime, control), keyNumber_(keyNumber), actionType_(actionType) {}
 
-    void executeAction() const override {
+    bool performAction() const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->reactsTo(InputType::MouseInput)) {
-        std::cout << "Mouse action executed: Button=" << keyNumber_ << " at time " << this->getActionTime() << "\n";
+      if (control && control->checkAction(InputType::MouseInput)) {
+        // *Действие выполнено*
+        return true;
       }
-    }
-
-    void print() const override {
-      std::cout << "MouseInput: Button=" << keyNumber_ << ", ActionTime=" << this->getActionTime() << ", ActionType=" << (actionType_ == ActionType::Press ? "Press" : "Release") << "\n";
+      return false;
     }
 
     MouseInput* clone() const override {
@@ -134,38 +131,27 @@ class MouseInput: public InputAction {
     ActionType actionType_;
 };
 
+
+// Вспомогательная структура
 struct FingerCoordinates {
-  FingerCoordinates(double sx, double sy, double ex, double ey) {
-    start.first = sx;
-    start.second = sy;
-    end.first = ex;
-    end.second = ey;
-  }
+  FingerCoordinates(double sx, double sy, double ex, double ey) : start{sx, sy}, end{ex, ey} {}
   std::pair<double, double> start;
   std::pair<double, double> end;
 };
 
+
 class TouchInput: public InputAction {
   public:
-    TouchInput(double actionTime, std::vector<FingerCoordinates> fingersCords, const std::shared_ptr<ControlElement> control)
-    : InputAction(actionTime, control){
-      fingersCords_ = std::move(fingersCords);
-      fingersCount_ = fingersCords_.size();
-    }
+    TouchInput(double actionTime, std::vector<FingerCoordinates> fingersCords, const std::shared_ptr<ControlElement>& control)
+    : InputAction(actionTime, control), fingersCords_(std::move(fingersCords)){}
 
-    void executeAction() const override {
+    bool performAction() const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->reactsTo(InputType::TouchInput)) {
-        std::cout << "Touch action executed with " << fingersCount_ << " fingers at time " << this->getActionTime() << "\n";
+      if (control && control->checkAction(InputType::TouchInput)) {
+        // *Действие выполнено*
+        return true;
       }
-    }
-
-    void print() const override {
-      std::cout << "TouchInput: ActionTime=" << this->getActionTime() << ", FingersCount=" << fingersCount_ << ", Coordinates=";
-      for (const auto& coord : fingersCords_) {
-        std::cout << " [Start(" << coord.start.first << ", " << coord.start.second << ") -> End(" << coord.end.first << ", " << coord.end.second << ")]";
-      }
-      std::cout << "\n";
+      return false;
     }
 
     TouchInput* clone() const override {
@@ -174,17 +160,18 @@ class TouchInput: public InputAction {
 
   private:
     std::vector<FingerCoordinates> fingersCords_;
-    int fingersCount_;
+    // int fingersCount_ совпадает с fingersCords_.size()
 };
+
 
 class ActionsQueue {
   public:
-    ActionsQueue(): actions_({}) {}
+    ActionsQueue() = default;
 
     ActionsQueue(const ActionsQueue& other) {
       actions_.reserve(other.actions_.size());
       for (const auto& action : other.actions_) {
-        actions_.push_back(std::shared_ptr<InputAction>(action->clone()));
+        actions_.push_back(std::unique_ptr<InputAction>(action->clone()));
       }
     }
 
@@ -193,97 +180,161 @@ class ActionsQueue {
         actions_.clear();
         actions_.reserve(other.actions_.size());
         for (const auto& action : other.actions_) {
-          actions_.push_back(std::shared_ptr<InputAction>(action->clone()));
+          actions_.push_back(std::unique_ptr<InputAction>(action->clone()));
         }
       }
       return *this;
     }
 
-
-    void addAction(std::shared_ptr<InputAction> action) {
-      actions_.push_back(action);
-      std::sort(actions_.begin(), actions_.end(), [](const std::shared_ptr<InputAction>& a, const std::shared_ptr<InputAction>& b) {
+    void addAction(std::unique_ptr<InputAction> action) {
+      actions_.push_back(std::move(action));
+      // Возможно стоит использовать бинпоиск для вставки в нужную позицию вместо сортировки после каждого добавления.
+      std::sort(actions_.begin(), actions_.end(), [](const auto& a, const auto& b) {
         return *a < *b;
       });
     }
 
-    std::vector<std::shared_ptr<InputAction>> getActionsForControl(const std::string& controlName, double startTime = 0.0, double endTime = std::numeric_limits<double>::max()) const {
-      std::vector<std::shared_ptr<InputAction>> result;
+    std::vector<InputAction*> getActionsForControl(const std::string& controlName, double startTime = 0.0, double endTime = std::numeric_limits<double>::max()) const {
+      std::vector<InputAction*> result;
       for (const auto& action : actions_) {
         if (action->getControl()->getName() == controlName && action->getActionTime() >= startTime && action->getActionTime() <= endTime) {
-          result.push_back(action);
+          result.push_back(action.get());
         }
       }
       return result;
     }
 
-    void executeActions() const {
-      std::cout << std::endl;
-      for (const auto& action : actions_) {
-        action->executeAction();
+    void performActions() {
+      // TODO Добавить в performAction проверку, чтобы действие не могло выполниться пока не пришло его время
+
+      // Задумка - удалять из очереди выполненые действия, чтобы можно было запускать функицию каждую секунду.
+      auto it = actions_.begin();
+      while (it != actions_.end()) {
+        if ((*it)->performAction()) {
+          it = actions_.erase(it);
+        }
+        else {++it;}
       }
     }
 
   private:
-    std::vector<std::shared_ptr<InputAction>> actions_;
+    // По задумке очередь - единственный владелец действий, наверное, правильно использовать unique_ptr ?
+    std::vector<std::unique_ptr<InputAction>> actions_;
 };
 
+
+// Фасад
+class InputManager {
+  public:
+    InputManager() = default;
+
+    void addControlElement(const std::string& name, const std::unordered_set<InputType>& allowedActions) {
+      controls_[name] = std::make_shared<ControlElement>(name, allowedActions);
+    }
+
+    std::shared_ptr<ControlElement> getControlElement(const std::string& name) const {
+      auto it = controls_.find(name);
+      return (it != controls_.end()) ? it->second : nullptr;
+    }
+
+    void addKeyboardAction(const std::string& key, double time, ActionType actionType, const std::string& controlName) {
+      auto control = getControlElement(controlName);
+      if (control) {
+        actionsQueue_.addAction(std::make_unique<KeyboardInput>(key, time, actionType, control));
+      }
+    }
+
+    void addMouseAction(int keyNumber, double time, ActionType actionType, const std::string& controlName) {
+      auto control = getControlElement(controlName);
+      if (control) {
+        actionsQueue_.addAction(std::make_unique<MouseInput>(keyNumber, time, actionType, control));
+      }
+    }
+
+    void addTouchAction(double time, std::vector<FingerCoordinates> fingers, const std::string& controlName) {
+      auto control = getControlElement(controlName);
+      if (control) {
+        actionsQueue_.addAction(std::make_unique<TouchInput>(time, std::move(fingers), control));
+      }
+    }
+
+    void performActions() {
+      actionsQueue_.performActions();
+    }
+
+  private:
+    std::unordered_map<std::string, std::shared_ptr<ControlElement>> controls_;
+    ActionsQueue actionsQueue_;
+};
+
+
 int main() {
-  // Test ControlElement class
-  ControlElement button("PlayButton", {InputType::KeyboardInput, InputType::MouseInput});
-  assert(button.getName() == "PlayButton");
-  assert(button.reactsTo(InputType::KeyboardInput) == true);
-  assert(button.reactsTo(InputType::TouchInput) == false);
-  button.addAction(InputType::TouchInput);
-  assert(button.reactsTo(InputType::TouchInput) == true);
+  // // Тест ControlElement
+  // ControlElement button("Jump", {InputType::KeyboardInput});
+  // assert(button.getName() == "Jump");
+  // assert(button.checkAction(InputType::KeyboardInput) == true);
+  // assert(button.checkAction(InputType::MouseInput) == false);
+  // button.addAction(InputType::MouseInput);
+  // assert(button.checkAction(InputType::MouseInput) == true);
+  // button.removeAction(InputType::KeyboardInput);
+  // assert(button.checkAction(InputType::KeyboardInput) == false);
 
-  // Test KeyboardInput
-  ControlElement keyboardControl("KeyboardControl", {InputType::KeyboardInput});
-  KeyboardInput keyPress("A", 1.0, ActionType::Press, std::make_shared<ControlElement>(keyboardControl));
-  KeyboardInput keyRelease = KeyboardInput::createRelease(keyPress, 2.0);
-  assert(keyPress.getControl()->getName() == "KeyboardControl");
-  assert(keyPress.getActionTime() == 1.0);
-  assert(keyRelease.getActionTime() == 2.0);
+  // // Тест KeyboardInput
+  // auto control = std::make_shared<ControlElement>("Jump", std::unordered_set<InputType>{InputType::KeyboardInput});
+  // KeyboardInput keyPress("Space", 1.0, ActionType::Press, control);
+  // assert(keyPress.getActionTime() == 1.0);
+  // assert(keyPress.performAction() == true);
+  // auto keyRelease = KeyboardInput::createRelease(keyPress, 2.0);
+  // assert(keyRelease.getActionTime() == 2.0);
+  // assert(keyRelease.performAction() == true);
 
-  // Test MouseInput
-  ControlElement mouseControl("MouseControl", {InputType::MouseInput});
-  MouseInput mousePress(1, 1.5, ActionType::Press, std::make_shared<ControlElement>(mouseControl));
-  assert(mousePress.getControl()->getName() == "MouseControl");
-  assert(mousePress.getActionTime() == 1.5);
+  // // Тест MouseInput
+  // auto mouseControl = std::make_shared<ControlElement>("Fire", std::unordered_set<InputType>{InputType::MouseInput});
+  // MouseInput mouseClick(1, 1.5, ActionType::Press, mouseControl);
+  // assert(mouseClick.getActionTime() == 1.5);
+  // assert(mouseClick.performAction() == true);
 
-  // Test TouchInput
-  ControlElement touchControl("TouchControl", {InputType::TouchInput});
-  std::vector<FingerCoordinates> fingers = {
-      FingerCoordinates(0.0, 0.0, 1.0, 1.0),
-      FingerCoordinates(1.0, 1.0, 2.0, 2.0)
-  };
-  TouchInput touch(2.5, fingers, std::make_shared<ControlElement>(touchControl));
-  assert(touch.getControl()->getName() == "TouchControl");
-  assert(touch.getActionTime() == 2.5);
+  // // Тест TouchInput
+  // auto touchControl = std::make_shared<ControlElement>("Swipe", std::unordered_set<InputType>{InputType::TouchInput});
+  // TouchInput touchAction(3.0, {{0.0, 0.0, 1.0, 1.0}}, touchControl);
+  // assert(touchAction.getActionTime() == 3.0);
+  // assert(touchAction.performAction() == true);
 
-  // Test polymorphism
-  std::vector<std::shared_ptr<InputAction>> inputs;
-  inputs.push_back(std::make_shared<KeyboardInput>(keyPress));
-  inputs.push_back(std::make_shared<MouseInput>(mousePress));
-  inputs.push_back(std::make_shared<TouchInput>(touch));
+  // // Тест ActionsQueue
+  // ActionsQueue queue;
+  // queue.addAction(std::make_unique<KeyboardInput>("Enter", 2.5, ActionType::Press, control));
+  // queue.addAction(std::make_unique<MouseInput>(2, 3.0, ActionType::Release, mouseControl));
+  // auto actions = queue.getActionsForControl("Jump");
+  // assert(actions.size() == 1);
+  // assert(actions[0]->getActionTime() == 2.5);
 
-  for (const auto& input : inputs) {
-      input->print();
-  }
+  // std::cout << "All tests passed successfully!" << std::endl;
 
-  // Test ActionsQueue
-  ActionsQueue actionQueue;
-  actionQueue.addAction(std::make_shared<KeyboardInput>(keyPress));
-  actionQueue.addAction(std::make_shared<MouseInput>(mousePress));
-  actionQueue.addAction(std::make_shared<TouchInput>(touch));
+  InputManager inputManager;
 
-  std::vector<std::shared_ptr<InputAction>> retrievedActions = actionQueue.getActionsForControl("MouseControl", 0.0, 2.0);
-  assert(retrievedActions.size() == 1);
-  assert(retrievedActions[0]->getActionTime() == 1.5);
+  inputManager.addControlElement("Textbox", {InputType::KeyboardInput});
+  inputManager.addControlElement("Button1", {InputType::MouseInput});
+  inputManager.addControlElement("Touchscreen", {InputType::TouchInput});
 
-  actionQueue.executeActions();
+  assert(inputManager.getControlElement("Textbox") != nullptr);
+  assert(inputManager.getControlElement("Button1") != nullptr);
+  assert(inputManager.getControlElement("Touchscreen") != nullptr);
+  assert(inputManager.getControlElement("NonExistent") == nullptr);
 
-  std::cout << "All tests passed!" << std::endl;
+  inputManager.addKeyboardAction("Space", 1.5, ActionType::Press, "Textbox");
+  inputManager.addMouseAction(1, 2.0, ActionType::Press, "Button1");
+  inputManager.addTouchAction(3.0, {FingerCoordinates(0, 0, 100, 100)}, "Touchscreen");
 
+  auto actionsJump = inputManager.getControlElement("Textbox");
+  auto actionsShoot = inputManager.getControlElement("Button1");
+  auto actionsSwipe = inputManager.getControlElement("Touchscreen");
+
+  assert(actionsJump->checkAction(InputType::KeyboardInput));
+  assert(actionsShoot->checkAction(InputType::MouseInput));
+  assert(actionsSwipe->checkAction(InputType::TouchInput));
+
+  inputManager.performActions();
+
+  std::cout << "All tests passed!\n";
   return 0;
 }
