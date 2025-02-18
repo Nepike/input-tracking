@@ -15,7 +15,6 @@ enum class InputType {
   TouchInput,
 };
 
-// Возможно, вместо енама лучше использовать булевое поле is_press ?
 enum class ActionType {
   Press,
   Release,
@@ -69,13 +68,12 @@ class InputAction {
       return actionTime_;
     }
 
-    virtual bool performAction() const = 0;
+    virtual bool performAction(double currentTime) const = 0;
 
     virtual InputAction* clone() const = 0;
 
   private:
     double actionTime_;
-    // Один и тот же элемент управления будет целью множества действий. Кажется, нужно использовать shared
     const std::shared_ptr<ControlElement> controlElement_;
 };
 
@@ -89,9 +87,9 @@ class KeyboardInput: public InputAction {
       return KeyboardInput(pressAction.keyName_, releaunordered_setime, ActionType::Release, pressAction.getControl());
     }
 
-    bool performAction() const override {
+    bool performAction(double currentTime) const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->checkAction(InputType::KeyboardInput)) {
+      if (control && control->checkAction(InputType::KeyboardInput) && this->getActionTime() >= currentTime) {
         // *Действие выполнено*
         return true;
       }
@@ -113,9 +111,9 @@ class MouseInput: public InputAction {
     MouseInput(int keyNumber, double actionTime, ActionType actionType, const std::shared_ptr<ControlElement>& control)
     : InputAction(actionTime, control), keyNumber_(keyNumber), actionType_(actionType) {}
 
-    bool performAction() const override {
+    bool performAction(double currentTime) const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->checkAction(InputType::MouseInput)) {
+      if (control && control->checkAction(InputType::MouseInput) && this->getActionTime() >= currentTime) {
         // *Действие выполнено*
         return true;
       }
@@ -145,9 +143,9 @@ class TouchInput: public InputAction {
     TouchInput(double actionTime, std::vector<FingerCoordinates> fingersCords, const std::shared_ptr<ControlElement>& control)
     : InputAction(actionTime, control), fingersCords_(std::move(fingersCords)){}
 
-    bool performAction() const override {
+    bool performAction(double currentTime) const override {
       std::shared_ptr<ControlElement> control = this->getControl();
-      if (control && control->checkAction(InputType::TouchInput)) {
+      if (control && control->checkAction(InputType::TouchInput) && this->getActionTime() >= currentTime) {
         // *Действие выполнено*
         return true;
       }
@@ -160,7 +158,6 @@ class TouchInput: public InputAction {
 
   private:
     std::vector<FingerCoordinates> fingersCords_;
-    // int fingersCount_ совпадает с fingersCords_.size()
 };
 
 
@@ -204,13 +201,11 @@ class ActionsQueue {
       return result;
     }
 
-    void performActions() {
-      // TODO Добавить в performAction проверку, чтобы действие не могло выполниться пока не пришло его время
-
+    void performActions(double currentTime) {
       // Задумка - удалять из очереди выполненые действия, чтобы можно было запускать функицию каждую секунду.
       auto it = actions_.begin();
       while (it != actions_.end()) {
-        if ((*it)->performAction()) {
+        if ((*it)->performAction(currentTime)) {
           it = actions_.erase(it);
         }
         else {++it;}
@@ -218,7 +213,7 @@ class ActionsQueue {
     }
 
   private:
-    // По задумке очередь - единственный владелец действий, наверное, правильно использовать unique_ptr ?
+    // уместность unique_ptr ?
     std::vector<std::unique_ptr<InputAction>> actions_;
 };
 
@@ -258,8 +253,8 @@ class InputManager {
       }
     }
 
-    void performActions() {
-      actionsQueue_.performActions();
+    void performActions(double currentTime) {
+      actionsQueue_.performActions(currentTime);
     }
 
   private:
@@ -333,7 +328,7 @@ int main() {
   assert(actionsShoot->checkAction(InputType::MouseInput));
   assert(actionsSwipe->checkAction(InputType::TouchInput));
 
-  inputManager.performActions();
+  inputManager.performActions(10);
 
   std::cout << "All tests passed!\n";
   return 0;
