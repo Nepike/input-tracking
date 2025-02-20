@@ -1,14 +1,50 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include "main.cpp"
 
-using namespace std;
+namespace py = pybind11;
 
-
-int add(int a, int b) {
-    return a + b + 100;
-}
 
 PYBIND11_MODULE(test_module, m) {
-    m.def("add", &add, "A function that adds two numbers");
+    // Регистрация перечислений
+    py::enum_<InputType>(m, "InputType")
+        .value("KeyboardInput", InputType::KeyboardInput)
+        .value("MouseInput", InputType::MouseInput)
+        .value("TouchInput", InputType::TouchInput);
+
+    py::enum_<ActionType>(m, "ActionType")
+        .value("Press", ActionType::Press)
+        .value("Release", ActionType::Release);
+
+    // Регистрация FingerCoordinates
+    py::class_<FingerCoordinates>(m, "FingerCoordinates")
+        .def(py::init<double, double, double, double>())
+        .def_readwrite("start", &FingerCoordinates::start)
+        .def_readwrite("end", &FingerCoordinates::end);
+
+    // Регистрация ControlElement с поддержкой shared_ptr
+    py::class_<ControlElement, std::shared_ptr<ControlElement>>(m, "ControlElement")
+        .def(py::init<const std::string&, const std::unordered_set<InputType>&>())
+        .def("addAction", &ControlElement::addAction)
+        .def("removeAction", &ControlElement::removeAction)
+        .def("checkAction", &ControlElement::checkAction)
+        .def("getName", &ControlElement::getName);
+
+    // Регистрация InputManager
+    py::class_<InputManager>(m, "InputManager")
+        .def(py::init<>())
+        .def("addControlElement", [](InputManager &self, const std::string &name, const py::set &allowed_actions_py) {
+            std::unordered_set<InputType> allowed_actions;
+            for (const auto &action : allowed_actions_py) {
+                allowed_actions.insert(action.cast<InputType>());
+            }
+            self.addControlElement(name, allowed_actions);
+        })
+        .def("getControlElement", &InputManager::getControlElement)
+        .def("addKeyboardAction", &InputManager::addKeyboardAction)
+        .def("addMouseAction", &InputManager::addMouseAction)
+        .def("addTouchAction", &InputManager::addTouchAction)
+        .def("performActions", &InputManager::performActions);
 }
 
 /*
