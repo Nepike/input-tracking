@@ -100,8 +100,8 @@ class VirtualKeyboard(QtWidgets.QWidget):
 class VirtualMouse(QtWidgets.QWidget):
 	def __init__(self):
 		super().__init__()
-		self.setFixedSize(200, 350)
 		self.setStyleSheet("background: transparent;")
+		self.setFixedSize(190, 340)
 
 		# Основные кнопки
 		self.left_btn = self._create_button("", QtCore.QRect(30, 65, 60, 100), 16)
@@ -133,52 +133,158 @@ class VirtualMouse(QtWidgets.QWidget):
 		""")
 		return btn
 
+	def sizeHint(self):
+		return QtCore.QSize(190, 340)
+
 	def paintEvent(self, event):
 		painter = QtGui.QPainter(self)
 		painter.setRenderHint(QtGui.QPainter.Antialiasing)
 
-		# Форма корпуса
 		path = QtGui.QPainterPath()
 		path.addRoundedRect(0, 55, 190, 285, 40, 60)
 		painter.fillPath(path, QtGui.QColor("#222"))
 
-		# Разделительная линия между кнопками
 		painter.setPen(QtGui.QPen(QtGui.QColor("#333"), 2))
 		painter.drawLine(95, 65, 95, 170)
+
+
+class QueueWidget(QtWidgets.QWidget):
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self.layout = QtWidgets.QVBoxLayout(self)
+		self.layout.setContentsMargins(5, 5, 5, 5)
+		self.layout.setSpacing(5)
+		self.elements = []
+		self.element_height = 30
+		self.setFixedWidth(150)
+		self.setMaximumHeight(250)
+		self.setStyleSheet("""
+			QWidget {
+				background-color: #f0f0f0;
+				border: 1px solid #999;
+				border-radius: 5px;
+			}
+		""")
+
+	def set_elements(self, elements_list):
+		self.elements = elements_list
+		self.update_display()
+
+	def update_display(self):
+		while self.layout.count():
+			child = self.layout.takeAt(0)
+			if child.widget():
+				child.widget().deleteLater()
+
+		available_height = self.maximumHeight()
+		spacing = self.layout.spacing()
+		element_total = self.element_height + spacing
+		max_possible = (available_height + spacing) // element_total
+
+		if len(self.elements) > max_possible:
+			display_elements = self.elements[:max_possible - 1]
+			display_elements.append("...")
+		else:
+			display_elements = self.elements[:max_possible]
+
+		for text in display_elements:
+			label = QtWidgets.QLabel(text)
+			label.setStyleSheet("""
+				QLabel {
+					background-color: white;
+					border: 1px solid #999;
+					border-radius: 3px;
+					padding: 2px;
+				}
+			""")
+			label.setFixedHeight(self.element_height)
+			self.layout.addWidget(label)
+
+		num_elements = len(display_elements)
+		needed_height = num_elements * (self.element_height + spacing) - spacing
+		self.setFixedHeight(min(needed_height, self.maximumHeight()))
 
 
 class MainWindow(QtWidgets.QWidget):
 	def __init__(self):
 		super().__init__()
-
-		main_layout = QtWidgets.QVBoxLayout()
-		main_layout.setContentsMargins(0, 0, 0, 0)
-		main_layout.setSpacing(0)
-		main_layout.addStretch()
-
-		line1 = QtWidgets.QWidget()
-		line1.setStyleSheet("background-color: #ccc;")
-		# container.setStyleSheet("background-color: #ccc;")
-		line1_layout = QtWidgets.QHBoxLayout(line1)
-		line1_layout.setContentsMargins(0, 0, 0, 0)
+		self.setWindowTitle("Virtual Input")
+		self.resize(1280, 720)
 
 		self.keyboard = VirtualKeyboard()
-		line1_layout.addWidget(self.keyboard, 0, QtCore.Qt.AlignBottom | QtCore.Qt.AlignLeft)
-
 		self.mouse = VirtualMouse()
-		line1_layout.addWidget(self.mouse, 0, QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight)
+		self.timer_label = QtWidgets.QLabel("0 seconds")
+		timer_font = self.timer_label.font()
+		timer_font.setPointSize(25)
+		timer_font.setBold(True)
+		self.timer_label.setFont(timer_font)
+		self.inputs_queue = QueueWidget()
+		self.inputs_queue.set_elements([
+			"Action 1 [Time: 1]", "Action 2 [Time: 2]", "Action 3 [Time: 3]", "Action 4 [Time: 4]",
+			"Action 5 [Time: 5]", "Action 6 [Time: 6]", "Action 7 [Time: 7]", "Action 8 [Time: 8]"
+		])
 
-		main_layout.addWidget(line1)
+		self.keyboard.setParent(self)
+		self.mouse.setParent(self)
+		self.timer_label.setParent(self)
+		self.inputs_queue.setParent(self)
 
-		self.setLayout(main_layout)
-		self.resize(1280, 720)
+		self.timer = QtCore.QTimer()
+		self.timer.timeout.connect(self.update_time)
+		self.start_time = QtCore.QDateTime.currentDateTime()
+		self.timer.start(1000)
+
+		self.update_geometries()
+
+	def update_time(self):
+		elapsed_time = self.start_time.secsTo(QtCore.QDateTime.currentDateTime())
+		self.timer_label.setText(f"{elapsed_time} seconds")
+
+	def update_geometries(self):
+		keyboard_width = self.keyboard.sizeHint().width()
+		keyboard_height = self.keyboard.sizeHint().height()
+		self.keyboard.setGeometry(
+			(self.width() - keyboard_width) // 2,  # X координата
+			self.height() - keyboard_height,  # Y координата
+			keyboard_width,  # Ширина
+			keyboard_height  # Высота
+		)
+
+		mouse_width = self.mouse.sizeHint().width()
+		mouse_height = self.mouse.sizeHint().height()
+		self.mouse.setGeometry(
+			self.width() - mouse_width,
+			self.height() - mouse_height,
+			mouse_width,
+			mouse_height
+		)
+
+		timer_width = self.timer_label.sizeHint().width()
+		timer_height = self.timer_label.sizeHint().height()
+		self.timer_label.setGeometry(
+			(self.width() - timer_width) // 2,
+			0,
+			timer_width,
+			timer_height
+		)
+		queue_width = self.inputs_queue.sizeHint().width()
+		queue_height = self.inputs_queue.sizeHint().height()
+		self.inputs_queue.setGeometry(
+			self.width() - queue_width - 35,
+			10,
+			queue_width,
+			queue_height
+		)
+
+	def resizeEvent(self, event):
+		self.update_geometries()
+		super().resizeEvent(event)
 
 
 if __name__ == "__main__":
 	app = QtWidgets.QApplication([])
 
 	window = MainWindow()
-	window.setWindowTitle("Virtual Input")
 	window.show()
 
 	sys.exit(app.exec())
