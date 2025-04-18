@@ -6,7 +6,6 @@ namespace py = pybind11;
 
 
 PYBIND11_MODULE(test_module, m) {
-    // Регистрация перечислений
     py::enum_<InputType>(m, "InputType")
         .value("KeyboardInput", InputType::KeyboardInput)
         .value("MouseInput", InputType::MouseInput)
@@ -16,13 +15,11 @@ PYBIND11_MODULE(test_module, m) {
         .value("Press", ActionType::Press)
         .value("Release", ActionType::Release);
 
-    // Регистрация FingerCoordinates
     py::class_<FingerCoordinates>(m, "FingerCoordinates")
         .def(py::init<double, double, double, double>())
         .def_readwrite("start", &FingerCoordinates::start)
         .def_readwrite("end", &FingerCoordinates::end);
 
-    // Регистрация ControlElement с поддержкой shared_ptr
     py::class_<ControlElement, std::shared_ptr<ControlElement>>(m, "ControlElement")
         .def(py::init<const std::string&, const std::unordered_set<InputType>&>())
         .def("addAction", &ControlElement::addAction)
@@ -30,7 +27,6 @@ PYBIND11_MODULE(test_module, m) {
         .def("checkAction", &ControlElement::checkAction)
         .def("getName", &ControlElement::getName);
 
-    // Регистрация InputManager
     py::class_<InputManager>(m, "InputManager")
         .def(py::init<>())
         .def("addControlElement", [](InputManager &self, const std::string &name, const py::set &allowed_actions_py) {
