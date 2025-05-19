@@ -25,6 +25,6 @@ void InputManager::addTouchAction(double time, std::vector<FingerCoordinates> co
     if (c) queue_.addAction(std::make_unique<TouchInput>(time, std::move(cords), c));
 }
 
-void InputManager::performActions(double now) {
-    queue_.performActions(now);
+std::vector<std::string> InputManager::performActions(double now) {
+    return queue_.performActions(now);
 }

@@ -1,4 +1,12 @@
 #include "InputAction.hpp"
+#include <sstream>
+#include <iomanip>
+
+std::string doubleToString(double value) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2) << value;
+    return ss.str();
+}
 
 InputAction::InputAction(double time, std::shared_ptr<ControlElement> ctrl)
     : time_(time), ctrl_(std::move(ctrl)) {}
@@ -28,9 +36,13 @@ KeyboardInput::KeyboardInput(std::string key, double time, ActionType at, std::s
 //     return KeyboardInput(pressAction.key_, time, ActionType::RELEASE, pressAction.getControl());
 // }
 
-bool KeyboardInput::perform(double current) const {
+std::string KeyboardInput::perform(double current) const {
     auto ctrl = getControl();
-    return ctrl && ctrl->checkAction(InputType::KEYBOARD) && getTime() <= current;
+    if (ctrl && ctrl->checkAction(InputType::KEYBOARD) && getTime() <= current) {
+        return "[KEYBOARD]> key " + key_ + (actionType_ == ActionType::PRESS ? " pressed" : " released") + 
+        " at " + doubleToString(getTime()) + " on control '" +  getControl()->getName() + "'";
+    }
+    return "";
 }
 
 std::unique_ptr<InputAction> KeyboardInput::clone() const {
@@ -42,9 +54,13 @@ std::unique_ptr<InputAction> KeyboardInput::clone() const {
 MouseInput::MouseInput(int key, double time, ActionType at, std::shared_ptr<ControlElement> c)
     : InputAction(time, c), keyNum_(key), actionType_(at) {}
 
-bool MouseInput::perform(double current) const {
+std::string MouseInput::perform(double current) const {
     auto ctrl = getControl();
-    return ctrl && ctrl->checkAction(InputType::MOUSE) && getTime() <= current;
+    if (ctrl && ctrl->checkAction(InputType::MOUSE) && getTime() <= current) {
+        return "[MOUSE]> mouse " + std::to_string(keyNum_) + (actionType_ == ActionType::PRESS ? " pressed" : " released") + 
+        " at " + doubleToString(getTime()) + " on control '" +  getControl()->getName() + "'";
+    }
+    return "";
 }
 
 std::unique_ptr<InputAction> MouseInput::clone() const {
@@ -56,9 +72,18 @@ std::unique_ptr<InputAction> MouseInput::clone() const {
 TouchInput::TouchInput(double time, std::vector<FingerCoordinates> cords, std::shared_ptr<ControlElement> c)
     : InputAction(time, c), cords_(std::move(cords)) {}
 
-bool TouchInput::perform(double current) const {
+std::string TouchInput::perform(double current) const {
     auto ctrl = getControl();
-    return ctrl && ctrl->checkAction(InputType::TOUCH) && getTime() <= current;
+    if (ctrl && ctrl->checkAction(InputType::TOUCH) && getTime() <= current) {
+        std::string buffer = "{ ";
+        for (const auto& cords : cords_) {
+            buffer.append("("+ doubleToString(cords.sx) + "," + doubleToString(cords.sy) + 
+            ")->(" + doubleToString(cords.ex) + "," + doubleToString(cords.ey) + ") ");
+        }
+        buffer.append("}");
+        return "[TOUCH]> gesture " + buffer + " at " + doubleToString(getTime()) + " on control '" +  getControl()->getName() + "'";
+    }
+    return "";
 }
 
 std::unique_ptr<InputAction> TouchInput::clone() const {

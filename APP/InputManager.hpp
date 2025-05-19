@@ -12,7 +12,7 @@ public:
     void addKeyboardAction(const std::string& key, double time, ActionType at, const std::string& control_name);
     void addMouseAction(int k, double time, ActionType at, const std::string& control_name);
     void addTouchAction(double time, std::vector<FingerCoordinates> v, const std::string& control_name);
-    void performActions(double now);
+    std::vector<std::string> performActions(double now);
 private:
     std::unordered_map<std::string, std::shared_ptr<ControlElement>> ctrls_;
     ActionsQueue queue_;

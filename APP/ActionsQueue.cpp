@@ -4,10 +4,24 @@ void ActionsQueue::addAction(std::unique_ptr<InputAction> a) {
     heap_.insert(std::move(a));
 }
 
-void ActionsQueue::performActions(double now) {
-    while (!heap_.empty() && heap_.peekMin()->perform(now)) {
-        heap_.extractMin();
+std::vector<std::string> ActionsQueue::performActions(double now) {
+    LeftistHeap left;
+    std::vector<std::string> responses;
+    std::string response;
+
+    while (!heap_.empty()) {
+        auto action = heap_.extractMin();
+        response = action->perform(now);
+
+        if (response != "") {
+            responses.push_back(response);
+        }
+        else {
+            left.insert(std::move(action));
+        }
     }
+    heap_ = std::move(left); // Кажется, это корректно, учитывая конструкторы в LeftistHeap
+    return responses;
 }
 
 std::vector<const InputAction*> ActionsQueue::getActionsForControl(const std::string& control_name, double start, double end) const {
